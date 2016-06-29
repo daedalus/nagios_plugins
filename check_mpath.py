@@ -33,41 +33,43 @@ def parse_esxi_mpath(data):
 	devices = "\n"
 	num_status = 0
 	device_count = 0
-
-	for line in data:
-		line = line.replace('\n',"")
-		if re.search('Device: ', line):
-			device = line[11:]	
-		if re.search('State: ', line):
-			state = line[10:]
+	if data:
+		for line in data:
+			line = line.replace('\n',"")
+			if re.search('Device: ', line):
+				device = line[11:]	
+			if re.search('State: ', line):
+				state = line[10:]
 		
-		if device != "" and state != "":
-			device_count += 1
+			if device != "" and state != "":
+				device_count += 1
 
-			if state == "dead":
-				num_status = 1
-			if state == "unkown":
-				num_status = 3 
-			if state == "disabled":
-				num_status = 1
+				if state == "dead":
+					num_status = 1
+				if state == "unkown":
+					num_status = 3 
+				if state == "disabled":
+					num_status = 1
 
-			if state == 'active':
-				active += 1
+				if state == 'active':
+					active += 1
 	
-			#print device,state	
+				#print device,state	
 
-			devices = devices + "Device: %s Status: %s" % (device,state) 
-			devices = devices + "\n" 
-			device = ""
-			dev_state = ""
+				devices = devices + "Device: %s Status: %s" % (device,state) 
+				devices = devices + "\n" 
+				device = ""
+				dev_state = ""
 
-	if device_count < last_device_count:
-		num_status = 1
+		if device_count < last_device_count:
+			num_status = 1
 
-	if active < 2:
-		num_status = 2
+		if active < 2:
+			num_status = 2
 
-	last_device_count = device_count
+		last_device_count = device_count
+	else:
+		num_status = 3
 
 	return (num_status,devices)
 
@@ -85,35 +87,37 @@ def parse_linux_mpath(data):
                 	return True
         	except ValueError:
                 	return False
+	if data:
+	        for line in data:
+        	        line = line.replace('\n','')
+                	d = line[:33]
+	                device = ''
 
-        for line in data:
-                line = line.replace('\n','')
-                d = line[:33]
-                device = ''
+        	        if is_hex(d):
+                	        device = d
+                        	str_status += '\nDevice: %s ' % device
+				device_count += 1
 
-                if is_hex(d):
-                        device = d
-                        str_status += '\nDevice: %s ' % device
-			device_count += 1
+        	        p = line.find('status=')
+                	if p > 0:
+                        	status = line[p+7:]
+	                        str_status += 'Status: %s ' % status
 
-                p = line.find('status=')
-                if p > 0:
-                        status = line[p+7:]
-                        str_status += 'Status: %s ' % status
-
-                        if (status != 'active' and status != 'enabled'):
-                                #print 'status',status
-                                ret = 1
-			if(status  == 'active'):
-				active += 1
+        	                if (status != 'active' and status != 'enabled'):
+                	                #print 'status',status
+                        	        ret = 1
+				if(status  == 'active'):
+					active += 1
 			
-	if device_count < last_device_count:
-               	num_status = 1
+		if device_count < last_device_count:
+        	       	num_status = 1
 
-	if active < 2:
-		ret = 2
+		if active < 2:
+			ret = 2
 
-	last_device_count = device_count
+		last_device_count = device_count
+	else:
+		ret = 3
 
         return ret,str_status
 
