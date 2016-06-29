@@ -33,6 +33,7 @@ def parse_esxi_mpath(data):
 	devices = "\n"
 	num_status = 0
 	device_count = 0
+	wwn = 0
 	if data:
 		for line in data:
 			line = line.replace('\n',"")
@@ -40,7 +41,9 @@ def parse_esxi_mpath(data):
 				device = line[11:]	
 			if re.search('State: ', line):
 				state = line[10:]
-		
+			if re.search('Target Transport',line):
+				wwn = line[35:]
+					
 			if device != "" and state != "":
 				device_count += 1
 
@@ -56,7 +59,7 @@ def parse_esxi_mpath(data):
 	
 				#print device,state	
 
-				devices = devices + "Device: %s Status: %s" % (device,state) 
+				devices = devices + "Device: %s WWN: %s Status: %s" % (device,wwn,state) 
 				devices = devices + "\n" 
 				device = ""
 				dev_state = ""
