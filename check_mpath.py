@@ -64,10 +64,6 @@ def parse_esxi_mpath(data):
 	if device_count < last_device_count:
 		num_status = 1
 
-		#print 'd',device_count,last_device_count
-
-	#print active
-
 	if active < 2:
 		num_status = 2
 
@@ -116,8 +112,6 @@ def parse_linux_mpath(data):
 
 	if active < 2:
 		ret = 2
-
-                #str_status += '\n'
 
 	last_device_count = device_count
 
@@ -181,7 +175,6 @@ def main():
 	else:
 		num_status = 3
                 device_summary = '\nBACKEND NOT IMPLEMENTED'
-
 
 	savecache(host,last_device_count)
 
