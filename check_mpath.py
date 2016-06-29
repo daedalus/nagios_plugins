@@ -33,7 +33,7 @@ def parse_esxi_mpath(data):
 	devices = "\n"
 	num_status = 0
 	device_count = 0
-	wwn = 0
+	wwn = ""
 	if data:
 		for line in data:
 			line = line.replace('\n',"")
@@ -44,11 +44,12 @@ def parse_esxi_mpath(data):
 			if re.search('Target Transport',line):
 				wwn = line[35:]
 					
-			if device != "" and state != "":
+			if device != "" and state != "" and wwn != "":
 				device_count += 1
 
 				if state == "dead":
 					num_status = 1
+					wwn = ''
 				if state == "unkown":
 					num_status = 3 
 				if state == "disabled":
