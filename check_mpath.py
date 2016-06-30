@@ -25,13 +25,17 @@ def exec_ssh(host,user,passwd,command):
 	return stdout.readlines()
 
 # parse the results of the esxi esxcfg-mpath -l
-def parse_esxi_mpath(data):
+def parse_esxi_mpath(data,verbose=False):
 	global last_device_count
 	device = ""
 	state = ""
 	active = 0
+	dead = 0
+	lost_devices = 0
+	unknown = 0
+	disabled = 0
 	devices = "\n"
-	num_status = 0
+	ret = 0
 	device_count = 0
 	wwn = ""
 	if data:
@@ -42,47 +46,60 @@ def parse_esxi_mpath(data):
 			if re.search('State: ', line):
 				state = line[10:]
 			if re.search('Target Transport',line):
-				wwn = line[35:]
+				wwn = line[35:58]
 					
 			if device != "" and state != "" and wwn != "":
 				device_count += 1
 
 				if state == "dead":
-					num_status = 1
+					dead += 1
+					ret = 1
 					wwn = ''
 				if state == "unkown":
-					num_status = 3 
+					unknown += 1
+					ret = 3 
 				if state == "disabled":
-					num_status = 1
-
+					disabled += 1
+					ret = 1
 				if state == 'active':
 					active += 1
 	
 				#print device,state	
 
-				devices = devices + "Device: %s WWN: %s Status: %s" % (device,wwn,state) 
-				devices = devices + "\n" 
+				if verbose:
+					devices = devices + "Device: %s WWN: %s Status: %s" % (device,wwn,state) 
+					#devices = devices + "Device: %s Status: %s" % (device,state) 
+					devices = devices + "\n" 
+
 				device = ""
 				dev_state = ""
+		
+		lost_devices = last_device_count - device_count 
 
-		if device_count < last_device_count:
-			num_status = 1
+		if lost_devices > 0:
+			ret = 1
+
+		devices = devices + "\nDevices Summary:\nActive: %d\nDisabled: %d\nUnknown: %d\nDead: %d\nLost: %d\n" %(active,disabled,unknown,dead,lost_devices)
+
 
 		if active < 2:
-			num_status = 2
+			ret = 2
 
 		last_device_count = device_count
 	else:
-		num_status = 3
+		ret = 3
 
-	return (num_status,devices)
+	return (ret,devices)
 
 # parse the results of the linux command multipath -l
-def parse_linux_mpath(data):
+def parse_linux_mpath(data,verbose=False):
 	global last_device_count
-        str_status = ''
+        devices = ''
         ret = 0
 	active = 0
+	status = ''
+	enabled = 0
+	lost_devices = 0
 	device_count = 0
 
         def is_hex(s):
@@ -99,22 +116,32 @@ def parse_linux_mpath(data):
 
         	        if is_hex(d):
                 	        device = d
-                        	str_status += '\nDevice: %s ' % device
 				device_count += 1
+
+				if verbose:
+					devices += "\nDevice: %s " % device
 
         	        p = line.find('status=')
                 	if p > 0:
                         	status = line[p+7:]
-	                        str_status += 'Status: %s ' % status
 
         	                if (status != 'active' and status != 'enabled'):
                 	                #print 'status',status
                         	        ret = 1
+				if(status == 'enabled'):
+					enabled += 1
 				if(status  == 'active'):
 					active += 1
-			
-		if device_count < last_device_count:
-        	       	num_status = 1
+	
+				if verbose:
+	                       		devices += 'Status: %s ' % status
+
+                lost_devices = last_device_count - device_count
+
+                if lost_devices > 0:
+                        ret = 1
+
+                devices = devices + "\nDevices Summary:\nActive: %d\nEnabled: %d\nLost: %d\n" %(active,enabled,lost_devices)
 
 		if active < 2:
 			ret = 2
@@ -123,18 +150,18 @@ def parse_linux_mpath(data):
 	else:
 		ret = 3
 
-        return ret,str_status
+        return (ret,devices)
 
 # ssh backend
-def ssh_mpath(host,user,passwd,system):
+def ssh_mpath(host,user,passwd,system,verbose=False):
 	if system == 'esxi':
 		command = 'esxcfg-mpath -l'
 		data = exec_ssh(host,user,passwd,command)
-		return parse_esxi_mpath(data)
+		return parse_esxi_mpath(data,verbose)
 	elif system == 'linux':
 		command = 'multipath -l'
 		data = exec_ssh(host,user,passwd,command)
-		return parse_linux_mpath(data)
+		return parse_linux_mpath(data,verbose)
 	else:
 		return (3,'\nSYSTEM NOT IMPLEMENTED')
 
@@ -163,6 +190,7 @@ def main():
 	parser.add_option("-p","--passwd",dest="passwd")
 	parser.add_option("-b","--backend",dest="backend")
 	parser.add_option("-s","--system",dest="system")
+	parser.add_option("-v","--verbose",dest="verbose")
 
 	(options,args) = parser.parse_args()
 
@@ -176,19 +204,19 @@ def main():
 		last_device_count = -1
 
 	if options.backend == 'ssh':
-		num_status,device_summary = ssh_mpath(host,user,passwd,options.system)
+		ret,device_summary = ssh_mpath(host,user,passwd,options.system,options.verbose)
 	elif options.backend == 'snmp':
-		num_status = 3
+		ret = 3
 		device_summary = '\nBACKEND STILL NOT IMPLEMENTED'
 	else:
-		num_status = 3
+		ret = 3
                 device_summary = '\nBACKEND NOT IMPLEMENTED'
 
 	savecache(host,last_device_count)
 
 	# output check results
-	print status[num_status] + device_summary
-	sys.exit(num_status)
+	print status[ret] + device_summary
+	sys.exit(ret)
 
 # Main entry point
 if __name__ == "__main__":
