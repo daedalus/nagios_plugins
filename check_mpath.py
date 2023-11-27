@@ -42,38 +42,38 @@ def parse_esxi_mpath(data,verbose=False):
 		for line in data:
 			line = line.replace('\n',"")
 			if re.search('Device: ', line):
-				device = line[11:]	
+				device = line[11:]
 			if re.search('State: ', line):
 				state = line[10:]
 			if re.search('Target Transport',line):
 				wwn = line[35:58]
-					
+
 			if device != "" and state != "" and wwn != "":
 				device_count += 1
 
-				if state == "dead":
+				if state == 'active':
+					active += 1
+
+				elif state == "dead":
 					dead += 1
 					ret = 1
 					wwn = ''
-				if state == "unkown":
-					unknown += 1
-					ret = 3 
-				if state == "disabled":
+				elif state == "disabled":
 					disabled += 1
 					ret = 1
-				if state == 'active':
-					active += 1
-	
+				elif state == "unkown":
+					unknown += 1
+					ret = 3
 				#print device,state	
 
 				if verbose:
-					devices = devices + "Device: %s WWN: %s Status: %s" % (device,wwn,state) 
+					devices = f"{devices}Device: {device} WWN: {wwn} Status: {state}"
 					#devices = devices + "Device: %s Status: %s" % (device,state) 
 					devices = devices + "\n" 
 
 				device = ""
 				dev_state = ""
-		
+
 		lost_devices = last_device_count - device_count 
 
 		if lost_devices > 0:
@@ -167,18 +167,17 @@ def ssh_mpath(host,user,passwd,system,verbose=False):
 
 # save the results in a cache 
 def savecache(host,devices):
-        fp = open('/tmp/check_mpath.%s.tmp' % host,'w')
-        fp.write('devices=%s' % str(devices))
-        fp.close()
+	with open(f'/tmp/check_mpath.{host}.tmp', 'w') as fp:
+		fp.write(f'devices={str(devices)}')
 
 # read the results from the cache
 def readcache(host):
-        fp = open('/tmp/check_mpath.%s.tmp' % host,'r')
-        for line in fp:
-                line = line.replace('\n','')
-                p = line.find('devices=')
-                if p > -1:
-                        return int(line[8:])
+	fp = open(f'/tmp/check_mpath.{host}.tmp', 'r')
+	for line in fp:
+	        line = line.replace('\n','')
+	        p = line.find('devices=')
+	        if p > -1:
+	                return int(line[8:])
 
 def main():
 	global last_device_count
